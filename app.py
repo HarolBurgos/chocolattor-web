@@ -287,7 +287,7 @@ def pagina_materias_primas():
         mp = MPS[idx]
 
         st.divider()
-        st.subheader(f"Insumos del Batch: {mp.nombre}")
+        st.subheader(f"Insumos y gastos asociados al Batch: {mp.nombre}")
 
         col1, col2, col3 = st.columns(3)
         with col1:
