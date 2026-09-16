@@ -75,6 +75,11 @@ if 'materias_primas' not in st.session_state:
         MateriaPrima("Leche en Polvo", 18000.0, "kg", 100.0),
     ]
 
+# Asignar rendimiento si el objeto lo soporta
+    for mp, rend in zip(st.session_state.materias_primas, [80.0, 100.0, 100.0, 100.0]):
+        if hasattr(mp, 'rendimiento'):
+            mp.rendimiento = rend
+
 if 'insumos_generales' not in st.session_state:
     st.session_state.insumos_generales = [
         InsumoGeneral("Caja de Cartón Exportación", 1200.0, "unidad"),
