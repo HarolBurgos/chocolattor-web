@@ -4,197 +4,193 @@ Reutilizadas directamente de la version de escritorio v5
 """
 import math
 
-
-class InsumoMP:
-    def __init__(self, nombre, cantidad, unidad, costo_unit):
-        self.nombre     = nombre
-        self.cantidad   = cantidad
-        self.unidad     = unidad
-        self.costo_unit = costo_unit
-
-    def costo_total(self):
-        return self.cantidad * self.costo_unit
-
-    def to_dict(self):
-        return {"nombre": self.nombre, "cantidad": self.cantidad,
-                "unidad": self.unidad, "costo_unit": self.costo_unit}
-
-    @staticmethod
-    def from_dict(d):
-        return InsumoMP(d["nombre"], d["cantidad"], d["unidad"], d["costo_unit"])
-
-
 class MateriaPrima:
-    TIPOS = ["Licor de cacao", "Manteca de cacao",
-             "Cocoa en polvo", "Nibs de cacao", "Otra"]
+    def __init__(self, nombre, costo, unidad="kg", rendimiento=100.0):
+        self.nombre = nombre
+        self.costo = float(costo)
+        self.unidad = unidad
+        self.rendimiento = float(rendimiento)
 
-    def __init__(self, nombre, batch_kg=30.0, rendimiento=75.0):
-        self.nombre      = nombre
-        self.batch_kg    = batch_kg
-        self.rendimiento = rendimiento
-        self.insumos     = []
-
-    def costo_total_batch(self):
-        return sum(i.costo_total() for i in self.insumos)
-
-    def costo_por_kg(self):
-        if self.batch_kg <= 0 or self.rendimiento <= 0:
-            return 0.0
-        return self.costo_total_batch() / self.batch_kg / (self.rendimiento / 100.0)
-
-    def costo_por_gramo(self):
-        return self.costo_por_kg() / 1000.0
-
-    def to_dict(self):
-        return {"nombre": self.nombre, "batch_kg": self.batch_kg,
-                "rendimiento": self.rendimiento,
-                "insumos": [i.to_dict() for i in self.insumos]}
-
-    @staticmethod
-    def from_dict(d):
-        mp = MateriaPrima(d["nombre"], d.get("batch_kg", 30.0), d.get("rendimiento", 75.0))
-        mp.insumos = [InsumoMP.from_dict(x) for x in d.get("insumos", [])]
-        return mp
-
-
-class InsumoGeneral:
-    CONV = {"kg": 1000.0, "gr": 1.0, "g": 1.0, "lb": 453.592,
-            "oz": 28.3495, "ml": 1.0, "l": 1000.0, "litros": 1000.0, "unidad": 1.0}
-
-    def __init__(self, nombre, cantidad, unidad, costo_total):
-        self.nombre      = nombre
-        self.cantidad    = cantidad
-        self.unidad      = unidad
-        self.costo_total = costo_total
-
-    def costo_por_gramo(self):
-        factor = self.CONV.get(self.unidad.lower(), 1.0)
-        base = self.cantidad * factor
-        return self.costo_total / base if base > 0 else 0.0
-
-    def to_dict(self):
-        return {"nombre": self.nombre, "cantidad": self.cantidad,
-                "unidad": self.unidad, "costo_total": self.costo_total}
-
-    @staticmethod
-    def from_dict(d):
-        return InsumoGeneral(d["nombre"], d["cantidad"], d["unidad"], d["costo_total"])
-
-
-class CostoFijo:
-    CATEGORIAS = ["General", "Arrendamiento", "Servicios", "Nomina",
-                  "Mantenimiento", "Mercadeo", "Depreciacion", "Otro"]
-
-    def __init__(self, nombre, monto, categoria="General"):
-        self.nombre    = nombre
-        self.monto     = monto
-        self.categoria = categoria
-
-    def to_dict(self):
-        return {"nombre": self.nombre, "monto": self.monto, "categoria": self.categoria}
-
-    @staticmethod
-    def from_dict(d):
-        return CostoFijo(d["nombre"], d["monto"], d.get("categoria", "General"))
-
-
-class OtroGasto:
-    def __init__(self, nombre, costo_unit):
-        self.nombre     = nombre
-        self.costo_unit = costo_unit
-
-    def to_dict(self):
-        return {"nombre": self.nombre, "costo_unit": self.costo_unit}
-
-    @staticmethod
-    def from_dict(d):
-        return OtroGasto(d["nombre"], d["costo_unit"])
-
-
-class ItemFormulacion:
-    def __init__(self, nombre, proporcion_pct):
-        self.nombre         = nombre
-        self.proporcion_pct = proporcion_pct
-
-    def to_dict(self):
-        return {"nombre": self.nombre, "proporcion_pct": self.proporcion_pct}
-
-    @staticmethod
-    def from_dict(d):
-        return ItemFormulacion(d["nombre"], d["proporcion_pct"])
-
-
-class Presentacion:
-    def __init__(self, nombre, peso_g):
-        self.nombre           = nombre
-        self.peso_g           = peso_g
-        self.formulacion      = []
-        self.otros_gastos     = []
-        self.cantidad_mensual = 0.0
-        self.iva_pct          = 0.0
-        self.ganancia_pct     = 0.0
-
-    def cpg(self, nombre_ing, mps, igs):
-        n = nombre_ing.strip().lower()
-        mp = next((m for m in mps if m.nombre.strip().lower() == n), None)
-        if mp: return mp.costo_por_gramo()
-        ig = next((i for i in igs if i.nombre.strip().lower() == n), None)
-        if ig: return ig.costo_por_gramo()
-        return 0.0
-
-    def costo_variable_insumos(self, mps, igs):
-        return sum((item.proporcion_pct / 100.0) * self.peso_g *
-                   self.cpg(item.nombre, mps, igs)
-                   for item in self.formulacion)
-
-    def costo_otros(self):
-        return sum(g.costo_unit for g in self.otros_gastos)
-
-    def costo_variable_unit(self, mps, igs):
-        return self.costo_variable_insumos(mps, igs) + self.costo_otros()
-
-    def costo_fijo_unit(self, total_cf):
-        return total_cf / self.cantidad_mensual if self.cantidad_mensual > 0 else 0.0
-
-    def costo_total_unit(self, mps, igs, total_cf):
-        return self.costo_variable_unit(mps, igs) + self.costo_fijo_unit(total_cf)
-
-    def precio_venta(self, mps, igs, total_cf):
-        ctu = self.costo_total_unit(mps, igs, total_cf)
-        return ctu * (1 + self.iva_pct / 100.0) * (1 + self.ganancia_pct / 100.0)
-
-    def margen_contrib(self, mps, igs, total_cf):
-        return (self.precio_venta(mps, igs, total_cf) -
-                self.costo_variable_unit(mps, igs))
+    def costo_real_unitario(self):
+        """Calcula el costo real unitario considerando la pérdida por rendimiento."""
+        if self.rendimiento > 0:
+            return self.costo / (self.rendimiento / 100.0)
+        return self.costo
 
     def to_dict(self):
         return {
-            "nombre": self.nombre, "peso_g": self.peso_g,
-            "formulacion":      [x.to_dict() for x in self.formulacion],
-            "otros_gastos":     [x.to_dict() for x in self.otros_gastos],
-            "cantidad_mensual": self.cantidad_mensual,
-            "iva_pct":          self.iva_pct,
-            "ganancia_pct":     self.ganancia_pct,
+            "nombre": self.nombre,
+            "costo": self.costo,
+            "unidad": self.unidad,
+            "rendimiento": self.rendimiento
         }
 
-    @staticmethod
-    def from_dict(d):
-        p = Presentacion(d["nombre"], d["peso_g"])
-        p.formulacion      = [ItemFormulacion.from_dict(x) for x in d.get("formulacion", [])]
-        p.otros_gastos     = [OtroGasto.from_dict(x)      for x in d.get("otros_gastos", [])]
-        p.cantidad_mensual = d.get("cantidad_mensual", 0.0)
-        p.iva_pct          = d.get("iva_pct", 0.0)
-        p.ganancia_pct     = d.get("ganancia_pct", 0.0)
-        return p
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            nombre=data.get("nombre", ""),
+            costo=data.get("costo", 0.0),
+            unidad=data.get("unidad", "kg"),
+            rendimiento=data.get("rendimiento", 100.0)
+        )
 
 
-def calcular_tir(flujos, max_iter=1000, tol=1e-7):
-    t = 0.1
+class InsumoGeneral:
+    def __init__(self, nombre, costo, unidad="unidad"):
+        self.nombre = nombre
+        self.costo = float(costo)
+        self.unidad = unidad
+
+    def to_dict(self):
+        return {
+            "nombre": self.nombre,
+            "costo": self.costo,
+            "unidad": self.unidad
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            nombre=data.get("nombre", ""),
+            costo=data.get("costo", 0.0),
+            unidad=data.get("unidad", "unidad")
+        )
+
+
+class CostoFijo:
+    def __init__(self, nombre, monto):
+        self.nombre = nombre
+        self.monto = float(monto)
+
+    def to_dict(self):
+        return {
+            "nombre": self.nombre,
+            "monto": self.monto
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            nombre=data.get("nombre", ""),
+            monto=data.get("monto", 0.0)
+        )
+
+
+class OtroGasto:
+    def __init__(self, nombre, monto):
+        self.nombre = nombre
+        self.monto = float(monto)
+
+    def to_dict(self):
+        return {
+            "nombre": self.nombre,
+            "monto": self.monto
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            nombre=data.get("nombre", ""),
+            monto=data.get("monto", 0.0)
+        )
+
+
+class ItemFormulacion:
+    def __init__(self, materia_prima: MateriaPrima, porcentaje: float):
+        self.materia_prima = materia_prima
+        self.porcentaje = float(porcentaje)
+
+    def calcular_costo_item(self, peso_total_g: float):
+        """Calcula el costo del ingrediente según el peso total del producto en gramos."""
+        peso_ingrediente_kg = (peso_total_g * (self.porcentaje / 100.0)) / 1000.0
+        return peso_ingrediente_kg * self.materia_prima.costo_real_unitario()
+
+    def to_dict(self):
+        return {
+            "materia_prima_nombre": self.materia_prima.nombre,
+            "porcentaje": self.porcentaje
+        }
+
+
+class InsumoMP:
+    def __init__(self, insumo: InsumoGeneral, cantidad: float = 1.0):
+        self.insumo = insumo
+        self.cantidad = float(cantidad)
+
+    def calcular_costo_insumo(self):
+        return self.insumo.costo * self.cantidad
+
+    def to_dict(self):
+        return {
+            "insumo_nombre": self.insumo.nombre,
+            "cantidad": self.cantidad
+        }
+
+
+class Presentacion:
+    def __init__(self, nombre: str, peso_g: float, items_formulacion: list, insumos: list = None, margen_deseado: float = 30.0):
+        self.nombre = nombre
+        self.peso_g = float(peso_g)
+        self.items_formulacion = items_formulacion  # Lista de ItemFormulacion
+        self.insumos = insumos if insumos is not None else []  # Lista de InsumoMP
+        self.margen_deseado = float(margen_deseado)
+
+    def calcular_cvu(self):
+        """Calcula el Costo Variable Unitario (CVU)."""
+        costo_mp = sum(item.calcular_costo_item(self.peso_g) for item in self.items_formulacion)
+        costo_ins = sum(ins.calcular_costo_insumo() for ins in self.insumos)
+        return costo_mp + costo_ins
+
+    def precio_sugerido(self):
+        """Calcula el precio de venta sugerido basado en el margen deseado."""
+        cvu = self.calcular_cvu()
+        if self.margen_deseado < 100:
+            return cvu / (1.0 - (self.margen_deseado / 100.0))
+        return cvu * (1.0 + (self.margen_deseado / 100.0))
+
+    def to_dict(self):
+        return {
+            "nombre": self.nombre,
+            "peso_g": self.peso_g,
+            "margen_deseado": self.margen_deseado,
+            "items_formulacion": [item.to_dict() for item in self.items_formulacion],
+            "insumos": [ins.to_dict() for ins in self.insumos]
+        }
+
+    @classmethod
+    def from_dict(cls, data, lista_mp, lista_ig):
+        items = []
+        for it in data.get("items_formulacion", []):
+            mp = next((x for x in lista_mp if x.nombre == it.get("materia_prima_nombre")), None)
+            if mp:
+                items.append(ItemFormulacion(mp, it.get("porcentaje", 0.0)))
+
+        insumos = []
+        for ins in data.get("insumos", []):
+            ig = next((x for x in lista_ig if x.nombre == ins.get("insumo_nombre")), None)
+            if ig:
+                insumos.append(InsumoMP(ig, ins.get("cantidad", 1.0)))
+
+        return cls(
+            nombre=data.get("nombre", ""),
+            peso_g=data.get("peso_g", 0.0),
+            items_formulacion=items,
+            insumos=insumos,
+            margen_deseado=data.get("margen_deseado", 30.0)
+        )
+
+
+def calcular_tir(flujos, tol=1e-6, max_iter=1000):
+    """Calcula la Tasa Interna de Retorno (TIR) por método de Newton-Raphson."""
+    guest = 0.1
     for _ in range(max_iter):
-        vpn  = sum(f / (1+t)**i for i, f in enumerate(flujos))
-        dvpn = sum(-i * f / (1+t)**(i+1) for i, f in enumerate(flujos))
-        if abs(dvpn) < 1e-14: return None
-        nt = t - vpn / dvpn
-        if abs(nt - t) < tol: return nt
-        t = nt
+        f_val = sum(f / ((1 + guest) ** i) for i, f in enumerate(flujos))
+        f_der = sum(-i * f / ((1 + guest) ** (i + 1)) for i, f in enumerate(flujos))
+        if abs(f_der) < 1e-12:
+            break
+        new_guest = guest - f_val / f_der
+        if abs(new_guest - guest) < tol:
+            return new_guest
+        guest = new_guest
     return None
+
