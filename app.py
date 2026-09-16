@@ -1,7 +1,6 @@
 """
 Chocolattor Web  -  Calculadora de Costos para Chocolate
-Desarrollado con Streamlit para ASOCACAO
-Una produccion de: AECID, Cooperacion Espanola, Ayuda en Accion
+Una produccion de: Ayuda en Acción Colombia y La Agencia Española de Cooperación Internacional para el Desarrollo - AECID
 """
 
 import streamlit as st
