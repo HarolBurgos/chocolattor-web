@@ -247,8 +247,7 @@ def info(txt):
 def pie():
     st.markdown("""
     <div class="footer">
-        Chocolattor v5 Web &nbsp;|&nbsp; ASOCACAO - Policarpa, Narino &nbsp;|&nbsp;
-        Una produccion de: AECID, Cooperacion Espanola y Ayuda en Accion
+        Chocolattor v5 Web &nbsp;|&nbsp; Una produccion de: Ayuda en Acción y La Agencia Española de Cooperación Internacional para el Desarrollo - AECID
     </div>
     """, unsafe_allow_html=True)
 
